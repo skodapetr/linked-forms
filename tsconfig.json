@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    // Aligns with Vue's browser support.
+    "target": "es5",
+    "strict": true,
+    "module": "es2015",
+    "moduleResolution": "node",
+    "allowJs": true,
+    "sourceMap": true,
+    "lib": [
+      "es2019",
+      "dom"
+    ]
+  }
+}
