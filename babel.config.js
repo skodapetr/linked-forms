@@ -13,7 +13,7 @@ module.exports = (api) => {
         "version": 3,
         "proposals": true,
       },
-    },],
+    }],
   ];
 
   const plugins = [];
@@ -21,7 +21,7 @@ module.exports = (api) => {
   // We do not transpile node_modules as that would lead to a bunch
   // of warnings.
   const ignore = [
-    "node_modules"
+    "node_modules",
   ];
 
   if (api.env(["development"])) {
