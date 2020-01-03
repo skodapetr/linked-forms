@@ -5,12 +5,12 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const OptimizeCSSAssetsPlugin = require("optimize-css-assets-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
+const CompressionPlugin = require("compression-webpack-plugin");
 
 const common = Object.assign({}, require("./webpack.common"));
 
 module.exports = merge(common, {
   "mode": "production",
-  "devtool": "source-map",
   "output": {
     "filename": path.join("assets", "bundle.[chunkhash].js"),
   },
@@ -30,11 +30,11 @@ module.exports = merge(common, {
       new TerserPlugin({
         "cache": true,
         "parallel": false,
-        "sourceMap": true,
+        "sourceMap": false,
         "terserOptions": {
           // https://github.com/terser/terser#compress-options
           "compress": {
-            "ecma": 6
+            "ecma": 6,
           },
         },
       }),
@@ -60,6 +60,10 @@ module.exports = merge(common, {
       "from": path.join(__dirname, "..", "public", "assets"),
       "to": path.join(__dirname, "..", "dist", "assets"),
     }]),
+    new CompressionPlugin({
+      "test": /\.js(\?.*)?$/i,
+      "deleteOriginalAssets": true,
+    }),
   ],
 });
 
