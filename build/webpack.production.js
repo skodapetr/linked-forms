@@ -5,7 +5,6 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const OptimizeCSSAssetsPlugin = require("optimize-css-assets-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
-const CompressionPlugin = require("compression-webpack-plugin");
 
 const common = Object.assign({}, require("./webpack.common"));
 
@@ -60,10 +59,6 @@ module.exports = merge(common, {
       "from": path.join(__dirname, "..", "public", "assets"),
       "to": path.join(__dirname, "..", "dist", "assets"),
     }]),
-    new CompressionPlugin({
-      "test": /\.js(\?.*)?$/i,
-      "deleteOriginalAssets": true,
-    }),
   ],
 });
 
