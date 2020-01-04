@@ -36,10 +36,11 @@ jobs:
         with:
           name: site
       - name: Deploy
-        uses: garygrossgarten/github-action-scp@release
+        uses: skodapetr/github-action-scp@release
         with:
           local: site
           remote: ${{ secrets.DEPLOY_DIRECTORY }}
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USERNAME }}
           password: ${{ secrets.DEPLOY_PASSWORD }}
+          clear: true
