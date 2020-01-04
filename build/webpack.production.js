@@ -11,7 +11,7 @@ const common = Object.assign({}, require("./webpack.common"));
 module.exports = merge(common, {
   "mode": "production",
   "output": {
-    "filename": path.join("assets", "bundle.js"),
+    "filename": path.join("assets", "bundle.[chunkhash].js"),
   },
   "optimization": {
     "splitChunks": {
@@ -20,7 +20,7 @@ module.exports = merge(common, {
           "test": /[\\/]node_modules[\\/]/,
           "name": "vendor",
           "chunks": "all",
-          "filename": path.join("assets", "commons.js"),
+          "filename": path.join("assets", "commons.[chunkhash].js"),
         },
       },
     },
