@@ -17,7 +17,8 @@ import {
   JsonForms,
 } from "@jsonforms/react";
 
-import {loadLinkedForm} from "./../rdflib-loader";
+import {loadLinkedForm} from "./../rdflib-form-loader";
+import {loadValuesSources} from "./../rdflib-values-loader";
 import {createNewValue} from "./../form-model";
 import {convert} from "./../form-to-jsonforms";
 
@@ -26,7 +27,8 @@ class _FormView extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      "iri": "https://linked.opendata.cz/resource/form/slovník.gov.cz/legislativní/sbírka/111/2009/pojem/orgán-veřejné-moci",
+      "iri": "https://linked.opendata.cz/resource/form/slovník.gov.cz/"
+        + "legislativní/sbírka/111/2009/pojem/orgán-veřejné-moci",
       "value": null,
       "schema": null,
       "uiSchema": null,
@@ -74,7 +76,6 @@ class _FormView extends React.Component {
         </div>
         }
         {this.state.status === 2 &&
-        //  TODO
         //  The Label in JsonForms use 125% height, so we need to get
         //  get rid of this.
         <div style={{"overflowX": "hidden"}}>
@@ -121,13 +122,17 @@ class _FormView extends React.Component {
     });
     loadLinkedForm(this.state.iri)
       .then((form) => {
-        const {schema, uiSchema} = convert(form);
-        const newValue = createNewValue(form);
-        this.setState({
-          "value": newValue,
-          "schema": schema,
-          "uiSchema": uiSchema,
-          "status": 2,
+        return loadValuesSources(form).then((sources) => {
+          console.log("FORM DEFINITION", form);
+          console.log("SOURCES", sources);
+          const {schema, uiSchema} = convert(form, sources);
+          const newValue = createNewValue(form);
+          this.setState({
+            "value": newValue,
+            "schema": schema,
+            "uiSchema": uiSchema,
+            "status": 2,
+          });
         });
       });
   }

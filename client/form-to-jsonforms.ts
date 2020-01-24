@@ -3,7 +3,7 @@ import {
     Form,
     LinkedForm, LangString,
 } from "./form-model";
-import shadows from "@material-ui/core/styles/shadows";
+import {ValuesSource, SkosItem, ValuesSourceMap} from "./codelist";
 
 export class SchemaEntry {
     type: string;
@@ -35,63 +35,59 @@ export class JsonForms {
 }
 
 /**
- * Declaration of function type for conversion to JsonForms.
- */
-type FieldConverter = {
-    (field: Field, propName: string, context: Context): void
-};
-
-/**
- * Used when no converter can be used for given data range.
- */
-const DEFAULT_CONVERTER_IRI = "http://localhost/default";
-
-/**
  * Used during the conversion to JsonForms.
  */
 class Context {
     schema: SchemaEntry;
     uiSchema: UiSchemaEntry;
     getString: { (value: LangString): string };
-    fieldConnectors: { [iri: string]: FieldConverter };
     propertyPathPrefix: string;
     linkedForm: LinkedForm;
+    sources: ValuesSourceMap;
 
     constructor(
         schema: SchemaEntry,
         uiSchema: UiSchemaEntry,
         linkedForm: LinkedForm,
-        getStringFnc: { (value: LangString): string }) {
+        getStringFnc: { (value: LangString): string },
+        sources: ValuesSourceMap) {
         this.schema = schema;
         this.uiSchema = uiSchema;
         this.linkedForm = linkedForm;
         this.getString = getStringFnc;
-        this.fieldConnectors = {};
         this.propertyPathPrefix = "#/properties/";
+        this.sources = sources;
     }
 
     forNestedForm(
-        propName: string, schema: SchemaEntry, uiSchema: UiSchemaEntry
+        propName: string, schema: SchemaEntry, uiSchema: UiSchemaEntry,
     ): Context {
-        const result =
-            new Context(schema, uiSchema, this.linkedForm, this.getString);
+        const result = new Context(
+              schema, uiSchema, this.linkedForm, this.getString, this.sources);
         result.getString = this.getString;
-        result.fieldConnectors = this.fieldConnectors;
-        result.propertyPathPrefix = this.propertyPathPrefix + propName + "/properties/";
+        result.propertyPathPrefix =
+          this.propertyPathPrefix + propName + "/properties/";
         return result;
     }
 
 }
+
+/**
+ * Declaration of function type for conversion to JsonForms.
+ */
+type FieldConverter = {
+    (field: Field, propName: string, context: Context): void
+};
 
 function getString(value: LangString): string {
     // TODO Add support for languages.
     return value["cs"];
 }
 
-export function convert(form: LinkedForm): JsonForms {
+export function convert(form: LinkedForm, sources: ValuesSourceMap): JsonForms {
     const schema = createEmptyObjectSchema();
     const uiSchema = createVerticalLayout();
-    const context = createDefaultRootContext(form, schema, uiSchema);
+    const context = createDefaultRootContext(form, schema, uiSchema, sources);
     addForm(form.getRootForm(), context);
     return new JsonForms(schema, uiSchema);
 }
@@ -105,12 +101,9 @@ function createVerticalLayout(): UiSchemaEntry {
 }
 
 function createDefaultRootContext(
-    form: LinkedForm, schema: SchemaEntry, uiSchema: UiSchemaEntry) {
-    const context = new Context(schema, uiSchema, form, getString);
-    context.fieldConnectors[DEFAULT_CONVERTER_IRI] = addFieldDefault;
-    context.fieldConnectors["http://www.w3.org/2000/01/rdf-schema#Literal"] =
-        addFieldLiteral;
-    return context;
+    form: LinkedForm, schema: SchemaEntry, uiSchema: UiSchemaEntry,
+    sources: ValuesSourceMap) {
+    return new Context(schema, uiSchema, form, getString, sources);
 }
 
 function addForm(form: Form, context: Context) {
@@ -126,15 +119,12 @@ function addForm(form: Form, context: Context) {
 }
 
 function addField(field: Field, propName: string, context: Context) {
-    const form = context.linkedForm.getFormForClass(field.property.range);
+    const form = context.linkedForm.getFormForClass(field.property.range.iri);
     if (form !== null) {
         addFieldForm(field, propName, context, form);
         return;
     }
-    let converter = context.fieldConnectors[field.property.range];
-    if (!converter) {
-        converter = context.fieldConnectors[DEFAULT_CONVERTER_IRI];
-    }
+    let converter = selectConverter(field, context);
     converter(field, propName, context);
 }
 
@@ -149,16 +139,80 @@ function addFieldForm(
     context.uiSchema.elements.push(uiSchema);
 }
 
-function addFieldDefault(field: Field, propName: string, context: Context) {
+function selectConverter(field: Field, context: Context) : FieldConverter {
+    if (field.valuesSource) {
+        return addFieldEnum;
+    }
+    if (field.type.includes(
+      "https://linked.opendata.cz/ontology/form/DateField")) {
+        return addFieldDate;
+    }
+    if (field.property.range.iri ===
+      "http://www.w3.org/2000/01/rdf-schema#Literal") {
+        return addFieldLiteral;
+    }
+    return addFieldUnsupported;
+}
+
+function addFieldEnum(field: Field, propName: string, context: Context) {
+    if (field.valuesSource == null) {
+        return addError(
+          field, "Missing values source definition for enum.", context);
+    }
+    const source = context.sources[field.valuesSource.iri];
+    if (!source) {
+        return addError(field, "Missing source for enum.", context);
+    }
+    context.schema.properties[propName] = {
+        "description": context.getString(field.property.title),
+        "type": "string",
+        "enum": prepareForEnum(source.getAllValues()),
+    };
+    context.uiSchema.elements.push({
+        "type": "Control",
+        "scope": context.propertyPathPrefix + propName,
+        "label": context.getString(field.title),
+    });
+}
+
+function addError(field: Field, error: string, context: Context) {
     context.uiSchema.elements.push({
         "type": "Label",
-        "text": "Unsupported field: " + field.property.range,
+        "text": "Error : " + error,
+    });
+}
+
+function prepareForEnum(items: SkosItem[]): string[] {
+    const result: string[] = [];
+    for (const item of items) {
+        const label = getString(item.prefLabel);
+        if (!result.includes(label)) {
+            result.push(label);
+        } else {
+            console.warn(
+              "Ignored duplicity SKOS item:",
+              item.notation, item.prefLabel);
+        }
+    }
+    return result;
+}
+
+function addFieldDate(field: Field, propName: string, context: Context) {
+    context.schema.properties[propName] = {
+        "description": context.getString(field.property.title),
+        "type": "string",
+        "format": "date",
+    };
+    context.uiSchema.elements.push({
+        "type": "Control",
+        "scope": context.propertyPathPrefix + propName,
+        "label": context.getString(field.title),
     });
 }
 
 function addFieldLiteral(field: Field, propName: string, context: Context) {
     context.schema.properties[propName] = {
-        "description": context.getString(field.property.prefLabel),
+        "description": context.getString(field.property.title),
         "type": "string",
     };
     context.uiSchema.elements.push({
@@ -167,6 +221,14 @@ function addFieldLiteral(field: Field, propName: string, context: Context) {
         "label": context.getString(field.title),
     });
 }
+
+function addFieldUnsupported(field: Field, propName: string, context: Context) {
+    context.uiSchema.elements.push({
+        "type": "Label",
+        "text": "Unsupported field: " + field.property.range.iri,
+    });
+}
+
 
 // https://jsonforms.io/docs/uischema/controls
 // Types:

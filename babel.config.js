@@ -22,6 +22,7 @@ module.exports = (api) => {
   // of warnings.
   const ignore = [
     "node_modules",
+    "dist",
   ];
 
   if (api.env(["development"])) {

@@ -1,12 +1,46 @@
 export type LangString = { [language: string]: string; };
 
+export class Dataset {
+    iri: string;
+    title: LangString;
+    endpoint: string;
+
+    constructor(iri: string, title:LangString, endpoint: string) {
+        this.iri = iri;
+        this.title = title;
+        this.endpoint = endpoint;
+    }
+
+}
+
+/**
+ * Represent a source of a SKOS codelist in form of a SPARQL query.
+ */
+export class ValuesQuery {
+    iri: string;
+    title: LangString;
+    dataset: Dataset;
+    query: string;
+
+    constructor(
+      iri: string, title: LangString, dataset: Dataset, query:string,) {
+        this.iri = iri;
+        this.title = title;
+        this.dataset = dataset;
+        this.query = query;
+    }
+
+}
+
 export class OntologyClass {
     iri: string;
-    prefLabel: LangString;
+    title: LangString;
+    type: string[];
 
-    constructor(iri: string, prefLabel: LangString,) {
+    constructor(iri: string, title: LangString,type: string[],) {
         this.iri = iri;
-        this.prefLabel = prefLabel;
+        this.title = title;
+        this.type = type;
     }
 }
 
@@ -17,8 +51,8 @@ export class OntologyProperty {
      * Can referer to a simple property as rdfs:Literal or
      * target class of a dialog.
      */
-    range: string;
-    prefLabel: LangString;
+    range: OntologyClass;
+    title: LangString;
     /**
      * Name used to represent this property in application,
      * must be unique. Is not loaded from the data.
@@ -28,14 +62,14 @@ export class OntologyProperty {
     constructor(
         iri: string,
         domain: OntologyClass,
-        range: string,
-        prefLabel: LangString,
+        range: OntologyClass,
+        title: LangString,
         name: string,
     ) {
         this.iri = iri;
         this.domain = domain;
         this.range = range;
-        this.prefLabel = prefLabel;
+        this.title = title;
         this.name = name;
     }
 }
@@ -45,17 +79,23 @@ export class Field {
     title: LangString;
     position: number;
     property: OntologyProperty;
+    valuesSource: ValuesQuery | null;
+    type: string[];
 
     constructor(
         iri: string,
         title: LangString,
         position: number,
         property: OntologyProperty,
+        valuesSource: ValuesQuery | null,
+        type: string[],
     ) {
         this.iri = iri;
         this.title = title;
         this.position = position;
         this.property = property;
+        this.valuesSource = valuesSource;
+        this.type = type;
     }
 }
 
@@ -91,7 +131,12 @@ export class LinkedForm {
      */
     iri: string;
     forms: { [iri: string]: Form } = {};
+
+    // Maps bellow are used to directly access objects of certain types.
+
     ontologyClasses: { [iri: string]: OntologyClass } = {};
+    valuesSources: { [iri:string]: ValuesQuery} = {};
+    datasets: { [iri:string]: Dataset} = {};
 
     constructor(iri: string) {
         this.iri = iri;
@@ -134,7 +179,7 @@ function createNewValueForForm(linkedForm: LinkedForm, form: Form): {} {
 }
 
 function createNewValueForField(linkedForm: LinkedForm, field: Field): any {
-    const form = linkedForm.getFormForClass(field.property.range);
+    const form = linkedForm.getFormForClass(field.property.range.iri);
     if (form !== null) {
         return createNewValueForForm(linkedForm, form);
     } else {
